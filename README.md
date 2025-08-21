@@ -1,173 +1,184 @@
-🚀 Project Overview
+📖 Hybrid SIEM Monitoring on Kubernetes
 
-We built a hybrid SIEM (Security Information & Event Management) stack deployed on Kubernetes.
+This repository documents the complete journey of building a Hybrid SIEM Monitoring system using Kubernetes, Prometheus, InfluxDB, Telegraf, and Grafana.
 
-Afreen focused on dashboard design and alert configuration inside Grafana.
+The project was designed to:
 
-[Your Name] handled Kubernetes pod deployments, Prometheus setup, and scraping/InfluxDB integration.
+Collect metrics from pods, nodes, and services
 
-The goal:
+Store them reliably in Prometheus and InfluxDB
 
-Collect metrics (CPU, memory, network, disk, custom tests).
+Visualize them in Grafana with rich dashboards
 
-Visualize them in Grafana dashboards.
+Trigger alerts to Slack/MS Teams
 
-Trigger alerts (via Slack) when thresholds were breached.
+Experiment with exporters (including USB detection, iperf tests, etc.)
 
-Test under hybrid setups (local pods, cloud-ready configs, serverless considerations).
+Afreen focused on dashboard design + alerts.
+Me(Aviral) worked on Kubernetes pods, Prometheus setup, and InfluxDB integration.
 
 📂 Project Structure
 siem-monitoring/
-├── manifests/           # All Kubernetes YAML files (deployments, services, configmaps)
-├── dashboards/          # Exported Grafana dashboards (JSON)
-├── alerts/              # Grafana/Prometheus alert rules
-├── telegraf/            # Telegraf configs for InfluxDB
-├── README.md            # This file (full documentation)
+├── manifests/                # Kubernetes YAML manifests
+│   ├── prometheus-config.yaml
+│   ├── prometheus-deploy.yaml
+│   ├── grafana-datasources.yaml
+│   ├── grafana-prometheus.yaml
+│   ├── grafana-pvc.yaml
+│   ├── node-exporter.yaml
+│   ├── telegraf.yaml
+│   ├── tailscale-config.md
+│   ├── ...
+│
+├── dashboards/               # Exported Grafana dashboards
+│   └── Hybrid-SIEM-K8-v2.json
+│
+├── alerts/                   # Prometheus/Grafana alert rules
+│   ├── Alert.yaml
+│   ├── Alert-ASCII-flow.yaml
+│
+├── telegraf/                 # Telegraf configs for InfluxDB
+│   ├── telegraf.conf
+│   ├── Dockerfile
+│
+├── exporter/                 # Custom exporters
+│   ├── endpoint-exporter.yaml
+│   ├── endpoint_exporter.py
+│   ├── Dockerfile
+│
+└── README.md                 # This file
 
-🏗️ Setup Process (Step by Step)
-1. Kubernetes Namespaces
+🚀 Step-by-Step Journey
+1. Setting Up the Environment
 
-We isolated components into two namespaces for clarity:
+Kubernetes cluster created locally.
 
-siem-ltm → Prometheus, Grafana, exporters
+Namespaces created:
 
-siem-event → InfluxDB, Telegraf, iperf-client
+siem-ltm → for long-term monitoring stack (Prometheus, Grafana, InfluxDB).
 
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: siem-ltm
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: siem-event
+siem-event → for event-based exporters and tests.
 
-2. Prometheus Deployment
+2. Prometheus Setup
 
-Deployed in siem-ltm.
+Configured via prometheus-config.yaml for scraping:
 
-Scrapes node-exporter, endpoint-exporter, and custom metrics.
+Node Exporter
 
-Configured prometheus.yml inside a ConfigMap.
+Telegraf metrics (pushed to InfluxDB)
 
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: prometheus-config
-  namespace: siem-ltm
-data:
-  prometheus.yml: |
-    scrape_configs:
-      - job_name: 'node'
-        static_configs:
-          - targets: ['node-exporter:9100']
+Blackbox exporter for endpoint monitoring
 
-3. Grafana Deployment
+Deployed via prometheus-deploy.yaml.
 
-Deployed in siem-ltm.
+Verified Prometheus targets and scrape intervals.
 
-Datasources: Prometheus + InfluxDB.
+3. Grafana Setup
 
-Dashboards stored in JSON (dashboards/Hybrid-SIEM-K8-v2.json).
+Installed in siem-ltm.
 
-4. InfluxDB + Telegraf
+Datasource config:
 
-Deployed in siem-event.
+Prometheus (for live K8s metrics).
 
-Telegraf scrapes system metrics + iperf tests, pushes to InfluxDB.
+InfluxDB (for Telegraf-collected metrics).
+
+Persistent Volume Claim added for dashboards to persist after restarts.
+
+Imported dashboard Hybrid-SIEM-K8-v2.json.
+
+4. Telegraf + InfluxDB Integration
+
+telegraf.conf configured to:
+
+Collect system/network metrics.
+
+Push data to InfluxDB.
+
+Deployed via telegraf.yaml.
+
+Validated using curl queries against InfluxDB to confirm metrics were stored.
 
 5. Exporters
 
-Node Exporter → for CPU, memory, disk, network.
+Node Exporter → pod-level and node-level metrics.
 
-Endpoint Exporter → for custom service monitoring.
+Custom Endpoint Exporter → Python-based (monitored USB events, etc.).
 
-iPerf → for active network throughput testing.
+Blackbox Exporter → monitored network endpoints, integrated with Prometheus.
 
-6. Alerts
+iperf pods → created for bandwidth testing (client/server custom images).
 
-Alerts configured in Grafana with Prometheus queries.
+6. Alerting Setup
 
-Notifications routed to Slack.
+Alerts defined in Prometheus + Grafana:
 
-Examples:
+High CPU/memory.
 
-Memory Alert
-(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) 
-  / node_memory_MemTotal_bytes * 100 > 80
+Disk usage thresholds.
 
-Network Alert
-rate(node_network_receive_bytes_total[1m]) > 1000000
-or
-rate(node_network_transmit_bytes_total[1m]) > 1000000
+Network packet drops.
 
+Endpoint downtime (via blackbox).
 
-Slack notifications were verified successfully.
+Slack webhook integrated for alert delivery.
 
-7. Dashboard
+Tweaked evaluation intervals for faster detection (reduced delay).
 
-Dashboard: Hybrid SIEM K8 v.2 (JSON exported in dashboards/).
-
-Panels: CPU, Memory, Disk I/O, Network, Custom tests.
-
-Designed by Afreen.
-
-⚔️ Challenges & Fixes
-Problem	What Happened	Fix
-Redash crash	UI broke after restart	Restarted from scratch, cleaned DB
-Pod stuck in Creating	Wrong file name usb.py shadowed dependency	Renamed file
-Empty Grafana data	Datasource misconfigured	Fixed Prometheus/Influx endpoints
-Slow Slack alerts	Delay in firing	Tweaked evaluation interval
-iperf missing	Pod failed (executable not found)	Built iperf client/server images
+⚔️ Problems We Faced & How We Solved Them
+Problem	Cause	Solution
+Redash crash	Restart caused DB corruption	Dropped DB + restarted fresh
+Pod stuck in Creating	File named usb.py shadowed dependency	Renamed file to avoid conflict
+Empty Grafana panels	Wrong datasource config	Fixed Prometheus + Influx endpoints
+Slow Slack alerts	Default evaluation interval too high	Tuned down to 15s
+iperf pods failing	Image missing executable	Built custom iperf images
+USB exporter error	Dependency mismatch	Fixed Python pyusb import
+Telegraf → Influx issues	Bad config	Corrected telegraf.conf + validated
+Grafana dashboards lost	Restart without PVC	Added persistent volume claim
 🌩️ Notes for Cloud / Serverless / Hybrid
+Cloud (EKS, AKS, etc.):
 
-Cloud (EKS/AKS/others):
+Always use Persistent Volumes for Prometheus/InfluxDB.
 
-Use persistent volumes for Prometheus & InfluxDB.
+Use external secret manager (AWS Secrets Manager, Azure Key Vault).
 
-External secret manager for credentials.
+Expose Grafana/Prometheus via Ingress + LoadBalancer.
 
 Serverless:
 
-Prometheus scraping must be externalized (use Prometheus + Pushgateway).
+Prometheus scraping doesn’t work well with short-lived pods → use Pushgateway.
 
-Not ideal for long-running exporters.
+Avoid exporters that need long sessions.
 
 Hybrid:
 
-Split monitoring namespaces (as we did).
+Split workloads into namespaces (like siem-ltm + siem-event).
 
-Route alerts to unified Slack/MS Teams channel.
+Centralize alerts into one Slack/MS Teams channel.
+
+Balance InfluxDB + Prometheus for storage and querying.
 
 🛠️ How to Run
-
-Clone repo:
-
+# Clone repository
 git clone https://github.com/your-org/siem-monitoring.git
 cd siem-monitoring
 
-
-Apply manifests:
-
+# Apply monitoring stack
 kubectl apply -f manifests/ -n siem-ltm
 kubectl apply -f manifests/ -n siem-event
 
-
-Port forward Prometheus/Grafana:
-
+# Port forward for local access
 kubectl port-forward svc/prometheus 9090:9090 -n siem-ltm
 kubectl port-forward svc/grafana 3000:3000 -n siem-ltm
 
 
-Import dashboards (dashboards/Hybrid-SIEM-K8-v2.json) into Grafana.
+👉 Then log in to Grafana (localhost:3000) and import the dashboard:
+dashboards/Hybrid-SIEM-K8-v2.json
 
 👥 Contributors
 
-Afreen → Dashboard design, alert setup.
+Afreen → Grafana dashboard design, alert configuration
 
-[Your Name] → Kubernetes deployments, Prometheus, scraping, InfluxDB integration.
+Me(Aviral) → Kubernetes pod deployments, Prometheus setup, Telegraf + InfluxDB integration
 
-📜 License
-
-MIT – free to use, share, improve.
+This file serves as both documentation and a record of every challenge + solution during our SIEM monitoring project.
