@@ -6,13 +6,13 @@
 ---
 
 ## 📖 Project Overview
-This project implements a **lightweight SIEM-lite monitoring stack** on **Kubernetes**, designed for real-time monitoring of nodes, endpoints, and events.  
+This project implements a **lightweight SIEM-lite monitoring stack** on **Kubernetes**, designed for real-time monitoring of nodes, endpoints, and events.
 
-It integrates multiple components:  
+**Components:**
 - **Prometheus** → scraping & alerting  
 - **Grafana** → visualization & alert delivery  
-- **InfluxDB + Telegraf** → time-series ingestion (system + event metrics pipeline)  
-- **Custom Python Exporter** → endpoint-level monitoring  
+- **InfluxDB + Telegraf** → time-series ingestion  
+- **Custom Python Exporter** → endpoint-level metrics  
 - **Node Exporter** → node-level metrics  
 
 **Namespaces Used:**  
@@ -21,7 +21,7 @@ It integrates multiple components:
 
 ---
 
- ## 🗂 Project Structure
+## 🗂 Project Structure
 ```plaintext
 /siem-monitoring
  ├── Exporter/
@@ -38,106 +38,6 @@ It integrates multiple components:
  │    ├── Dockerfile
  │    ├── telegraf.conf
  │    └── telegraf.yaml
-
----
-
-## ⚙️ Setup Instructions
- 1️⃣ Clone Repository
-git clone https://github.com/LAVR-69/SIEM-Monitoring.git
-cd SIEM-Monitoring
-
-2️⃣ Create Namespaces
-kubectl create ns siem-ltm || true
-kubectl create ns siem-event || true
-
-3️⃣ Deploy Prometheus, Grafana, Node Exporter (siem-ltm)
-kubectl apply -f prometheus-config.yaml -n siem-ltm
-kubectl apply -f prometheus-deploy.yaml -n siem-ltm
-kubectl apply -f grafana-pvc.yaml -n siem-ltm
-kubectl apply -f grafana-prometheus.yaml -n siem-ltm
-kubectl apply -f grafana-datasources.yaml -n siem-ltm
-kubectl apply -f node-exporter.yaml -n siem-ltm
-
-4️⃣ Deploy InfluxDB + Telegraf (siem-event)
-kubectl apply -f Telegraf/telegraf.yaml -n siem-event
-
-5️⃣ Deploy Endpoint Exporter (siem-ltm)
-kubectl apply -f Exporter/endpoint-exporter.yaml -n siem-ltm
-
-6️⃣ Access Services (Local Port-Forward)
-kubectl port-forward svc/prometheus 9090:9090 -n siem-ltm
-kubectl port-forward svc/grafana 3000:3000 -n siem-ltm
-kubectl port-forward svc/influxdb 8086:8086 -n siem-event
-
-7️⃣ Import Dashboard & Alerts
-
-## Dashboard JSON:
-Hybrid SIEM K8 v.2/Hybrid SIEM K8 v.2-1755813699348.json
-
-## Alerts Config:
-Hybrid SIEM K8 v.2/Alert.yaml
-
-8️⃣ Notifications
-
-## Configure Slack/MS Teams inside Grafana:
-
-Alerting → Contact Points
-
-Route alerts via Notification Policies
-
----
-
-## ✅ Do’s (What We Did Right)
-
-Used Kubernetes manifests → reproducible, scalable deployments
-
-Integrated Telegraf + InfluxDB → lightweight time-series pipeline
-
-Modularized configs → Prometheus, Grafana, Telegraf, exporters separated
-
-Pre-built JSON dashboards → fast reproducibility
-
-Slack alerts worked for critical events
-
-## ❌ Don’ts (Mistakes Made)
-
-Didn’t configure persistent storage for InfluxDB → metrics reset on pod restart
-
-Mixed manual steps + automation instead of full automation
-
-Initially missed namespaces → risked cluster conflicts
-
-Poor exporter documentation → caused scrape failures
-
-## 🏆 Achievements
-
-Fully working SIEM-lite dashboard (system, network, endpoint metrics)
-
-Integrated data sources: Prometheus + InfluxDB → Grafana
-
-Fixed “empty Grafana” issue by stabilizing Telegraf → Influx pipeline
-
-Achieved real-time monitoring with low latency
-
-Alerts flowing end-to-end → Prometheus → Grafana → Slack
-
-## ⚠️ Limitations
-
-No centralized logs (ELK/Loki missing)
-
-Alerts need tuning (false positives exist)
-
-Grafana has only admin-level access (no RBAC yet)
-
-Metrics retention limited (InfluxDB not persistent)
-
-Dashboards/alerts not auto-provisioned (manual import)
-
-## 👥 Contributors
-
-Afreen — Grafana dashboards & alert setup
-
-Aviral (me) — Kubernetes manifests, Prometheus configs, InfluxDB + Telegraf integration
  │
  ├── grafana-datasources.yaml
  ├── grafana-prometheus.yaml
@@ -149,4 +49,108 @@ Aviral (me) — Kubernetes manifests, Prometheus configs, InfluxDB + Telegraf in
  └── README.md
 
 ---
+
+## 1️⃣ Clone Repository
+
+git clone https://github.com/LAVR-69/SIEM-Monitoring.git
+cd SIEM-Monitoring
+
+
+## 2️⃣ Create Namespaces
+
+kubectl create ns siem-ltm || true
+kubectl create ns siem-event || true
+
+
+## 3️⃣ Deploy Prometheus, Grafana, Node Exporter
+
+kubectl apply -f prometheus-config.yaml -n siem-ltm
+kubectl apply -f prometheus-deploy.yaml -n siem-ltm
+kubectl apply -f grafana-pvc.yaml -n siem-ltm
+kubectl apply -f grafana-prometheus.yaml -n siem-ltm
+kubectl apply -f grafana-datasources.yaml -n siem-ltm
+kubectl apply -f node-exporter.yaml -n siem-ltm
+
+
+## 4️⃣ Deploy InfluxDB + Telegraf
+
+kubectl apply -f Telegraf/telegraf.yaml -n siem-event
+
+
+## 5️⃣ Deploy Endpoint Exporter
+
+kubectl apply -f Exporter/endpoint-exporter.yaml -n siem-ltm
+
+
+## 6️⃣ Access Services Locally
+
+kubectl port-forward svc/prometheus 9090:9090 -n siem-ltm
+kubectl port-forward svc/grafana 3000:3000 -n siem-ltm
+kubectl port-forward svc/influxdb 8086:8086 -n siem-event
+
+
+## 7️⃣ Import Dashboards & Alerts
+
+JSON Dashboard: Hybrid SIEM K8 v.2/Hybrid SIEM K8 v.2-1755813699348.json
+
+Alerts Snapshot: Hybrid SIEM K8 v.2/Alert.yaml
+
+## 8️⃣ Configure Notifications
+
+Slack / MS Teams → Grafana → Alerting → Contact Points
+
+Route alerts via Notification Policies
+
+## ✅ Do’s (What We Did Right)
+
+Used Kubernetes manifests → reproducible & scalable
+
+Integrated Telegraf + InfluxDB → lightweight metric pipeline
+
+Modular configs → Prometheus, Grafana, Telegraf, exporters separated
+
+Pre-built JSON dashboards → fast reproducibility
+
+Slack alerting functional for critical events
+
+## ❌ Don’ts (Mistakes Made)
+
+Didn’t persist InfluxDB → metrics lost on pod restart
+
+Mixed manual + automated steps → should be fully automated
+
+Initially missed namespaces → risked conflicts
+
+Exporter endpoints poorly documented → scrape failures
+
+## 🏆 Achievements
+
+Fully working SIEM-lite dashboard (system, network, endpoint metrics)
+
+Multi-source data integration → Grafana dashboards
+
+Fixed empty Grafana panels → stable Telegraf → Influx pipeline
+
+Real-time monitoring with low latency
+
+Alerts pipeline working → Prometheus → Grafana → Slack
+
+## ⚠️ Limitations
+
+No centralized logs (ELK/Loki missing)
+
+Alerts require tuning (some false positives)
+
+Grafana has only admin-level access (no RBAC yet)
+
+Metrics retention limited (InfluxDB not persistent)
+
+Dashboards/alerts not auto-provisioned (manual import)
+
+## 👥 Contributors
+
+Afreen → Grafana dashboards & alert setup
+
+Aviral (me) → Kubernetes manifests, Prometheus configs, InfluxDB + Telegraf integration
+
 
