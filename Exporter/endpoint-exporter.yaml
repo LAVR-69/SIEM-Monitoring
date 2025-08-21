@@ -1,0 +1,58 @@
+# ------------------------------
+# Endpoint Exporter Service
+# ------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: endpoint-exporter
+  namespace: siem-ltm
+spec:
+  selector:
+    app: endpoint-exporter
+  type: NodePort
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 9101
+      targetPort: 9101
+      nodePort: 32010
+---
+# ------------------------------
+# Endpoint Exporter Deployment
+# ------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: endpoint-exporter
+  namespace: siem-ltm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: endpoint-exporter
+  template:
+    metadata:
+      labels:
+        app: endpoint-exporter
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+        - name: endpoint-exporter
+          image: usb-endpoint-exporter:latest   # rebuild image if needed
+          imagePullPolicy: Never
+          command: ["python", "/app/endpoint_exporter.py"]
+          ports:
+            - containerPort: 9101
+          volumeMounts:
+#            - name: exporter-code
+#              mountPath: /app
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+      volumes:
+        - name: exporter-code
+          configMap:
+            name: usb-endpoint-exporter-code   # ensure this contains endpoint_exporter.py
+

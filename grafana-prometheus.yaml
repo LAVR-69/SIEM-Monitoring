@@ -1,0 +1,229 @@
+# ------------------------------
+# Namespace
+# ------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: siem-ltm
+---
+# ------------------------------
+# Prometheus ConfigMap
+# ------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: siem-ltm
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      - job_name: 'endpoint_exporter'
+        static_configs:
+          - targets: ['endpoint-exporter.siem-ltm.svc.cluster.local:9101']
+---
+# ------------------------------
+# Prometheus Deployment
+# ------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: siem-ltm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            name: prometheus-config
+---
+# ------------------------------
+# Prometheus Service
+# ------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: siem-ltm
+spec:
+  selector:
+    app: prometheus
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+      nodePort: 31547
+---
+# ------------------------------
+# Grafana Deployment
+# ------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: siem-ltm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana-oss:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "Cerebroloxy@579"
+---
+# ------------------------------
+# Grafana Service
+# ------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: siem-ltm
+spec:
+  selector:
+    app: grafana
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+      nodePort: 31865
+---
+# ------------------------------
+# Endpoint Exporter ConfigMap
+# ------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: endpoint-exporter-code
+  namespace: siem-ltm
+data:
+  endpoint_exporter.py: |
+    from prometheus_client import start_http_server, Gauge
+    import psutil
+    import time
+
+    endpoint_gauge = Gauge('endpoints_connected', 'Number of endpoints connected')
+    network_gauge = Gauge('network_bytes_sent', 'Network bytes sent')
+
+    def collect_metrics():
+        endpoint_gauge.set(2)
+        net = psutil.net_io_counters()
+        network_gauge.set(net.bytes_sent)
+
+    if __name__ == "__main__":
+        start_http_server(9101, addr="0.0.0.0")
+        while True:
+            collect_metrics()
+            time.sleep(5)
+---
+# ------------------------------
+# Endpoint Exporter Deployment
+# ------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: endpoint-exporter
+  namespace: siem-ltm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: endpoint-exporter
+  template:
+    metadata:
+      labels:
+        app: endpoint-exporter
+    spec:
+      containers:
+        - name: endpoint-exporter
+          image: endpoint-exporter:latest
+          imagePullPolicy: Never
+          command: ["python3", "/app/endpoint_exporter.py"]
+          ports:
+            - containerPort: 9101
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9101
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9101
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: exporter-code
+              mountPath: /app
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+      volumes:
+        - name: exporter-code
+          configMap:
+            name: endpoint-exporter-code
+---
+# ------------------------------
+# Endpoint Exporter Service
+# ------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: endpoint-exporter
+  namespace: siem-ltm
+spec:
+  selector:
+    app: endpoint-exporter
+  type: NodePort
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 9101
+      targetPort: 9101
+      nodePort: 32010
+

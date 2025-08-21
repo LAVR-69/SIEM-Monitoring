@@ -1,0 +1,68 @@
+# ------------------------------
+# Node Exporter DaemonSet
+# ------------------------------
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: siem-ltm
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+    spec:
+      containers:
+      - name: node-exporter
+        image: prom/node-exporter:latest
+        imagePullPolicy: Always
+        args:
+          - --path.procfs=/host/proc
+          - --path.sysfs=/host/sys
+          - --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+        ports:
+        - containerPort: 9100
+          protocol: TCP
+        volumeMounts:
+        - name: textfile
+          mountPath: /var/lib/node_exporter/textfile_collector
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+      volumes:
+      - name: textfile
+        hostPath:
+          path: /var/lib/node_exporter/textfile_collector
+          type: DirectoryOrCreate
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+---
+# ------------------------------
+# Node Exporter Service
+# ------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-exporter
+  namespace: siem-ltm
+  labels:
+    app: node-exporter
+spec:
+  clusterIP: None   # Headless service for Prometheus discovery
+  selector:
+    app: node-exporter
+  ports:
+    - name: metrics
+      port: 9100
+      targetPort: 9100
+
