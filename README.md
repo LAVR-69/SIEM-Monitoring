@@ -39,7 +39,7 @@ It integrates multiple components:
  │    ├── telegraf.conf
  │    └── telegraf.yaml
 
----
+
 
 ## ⚙️ Setup Instructions
  1️⃣ Clone Repository
@@ -85,7 +85,7 @@ Alerting → Contact Points
 
 Route alerts via Notification Policies
 
----
+
 
 ## ✅ Do’s (What We Did Right)
 
