@@ -2,7 +2,7 @@
 # 🚀 SIEM-Monitoring Dashboard
 
 ## 📸 Dashboard Preview
-![SIEM-Monitoring Dashboard Screenshot](./Screenshot.png)
+![SIEM-Monitoring Dashboard Screenshot](./Screenshot-1.png)
 
 ---
 
